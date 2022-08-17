@@ -33,7 +33,10 @@ class StreamingImageNet1k(StreamingDataset, VisionDataset):
         shuffle (bool): Whether to shuffle the samples in this dataset.
         resize_size (int, optional): The resize size to use. Use -1 to not resize. Default: ``-1``.
         crop size (int): The crop size to use. Default: ``224``.
-        batch_size (Optional[int]): Hint batch_size that will be used on each device's DataLoader. Default: ``None``.
+        batch_size (Optional[int]): Hint batch_size that will be used on each device's
+            DataLoader. Default: ``None``.
+        no_random_transforms (bool, optional): Whether to not use random resized crop and
+            random horizontal flip. Default: ``False``.
     """
 
     def decode_image(self, data: bytes) -> Image.Image:
@@ -65,7 +68,8 @@ class StreamingImageNet1k(StreamingDataset, VisionDataset):
                  shuffle: bool,
                  resize_size: int = -1,
                  crop_size: int = 224,
-                 batch_size: Optional[int] = None):
+                 batch_size: Optional[int] = None,
+                 no_random_transforms: Optional[bool] = False):
         # Build StreamingDataset
         decoders = {
             'x': self.decode_image,
@@ -91,10 +95,13 @@ class StreamingImageNet1k(StreamingDataset, VisionDataset):
             if resize_size > 0:
                 train_transforms.append(transforms.Resize(resize_size))
             # always include RandomResizedCrop and RandomHorizontalFlip
-            train_transforms += [
-                transforms.RandomResizedCrop(crop_size, scale=(0.08, 1.0), ratio=(0.75, 4.0 / 3.0)),
-                transforms.RandomHorizontalFlip(),
-            ]
+            if not no_random_transforms:
+                train_transforms += [
+                    transforms.RandomResizedCrop(crop_size, scale=(0.08, 1.0), ratio=(0.75, 4.0 / 3.0)),
+                    transforms.RandomHorizontalFlip(),
+                ]
+            else:
+                train_transforms += [transforms.CenterCrop(crop_size)]
             transform = transforms.Compose(train_transforms)
         else:
             val_transforms: List[torch.nn.Module] = []

@@ -218,6 +218,8 @@ class StreamingImageNet1kHparams(DatasetHparams):
         split (str): The dataset split to use, either 'train' or 'val'. Default: ``'train```.
         resize_size (int, optional): The resize size to use. Use -1 to not resize. Default: ``-1``.
         crop size (int): The crop size to use. Default: ``224``.
+        no_random_transforms (bool, optional): Whether to not use random resized crop and
+            random horizontal flip. Default: ``False``.
     """
 
     remote: str = hp.optional('Remote directory (S3 or local filesystem) where dataset is stored',
@@ -227,6 +229,7 @@ class StreamingImageNet1kHparams(DatasetHparams):
     split: str = hp.optional("Which split of the dataset to use. Either ['train', 'val']", default='train')
     resize_size: int = hp.optional('Resize size. Set to -1 to not resize', default=-1)
     crop_size: int = hp.optional('Crop size', default=224)
+    no_random_transforms: bool = hp.optional("Don't use RRC and random LR flip.", default=False)
 
     def initialize_object(self, batch_size: int, dataloader_hparams: DataLoaderHparams) -> DataSpec:
         dataset = StreamingImageNet1k(remote=self.remote,
@@ -235,7 +238,8 @@ class StreamingImageNet1kHparams(DatasetHparams):
                                       shuffle=self.shuffle,
                                       resize_size=self.resize_size,
                                       crop_size=self.crop_size,
-                                      batch_size=batch_size)
+                                      batch_size=batch_size,
+                                      no_random_transforms=self.no_random_transforms)
         collate_fn = pil_image_collate
         device_transform_fn = NormalizationFn(mean=IMAGENET_CHANNEL_MEAN, std=IMAGENET_CHANNEL_STD)
         return DataSpec(dataloader=dataloader_hparams.initialize_object(
