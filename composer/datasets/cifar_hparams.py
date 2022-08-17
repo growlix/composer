@@ -46,6 +46,8 @@ class CIFAR10DatasetHparams(DatasetHparams, SyntheticHparamsMixin):
         datadir (str): The path to the data directory.
         is_train (bool): Whether to load the training data or validation data. Default:
             ``True``.
+        no_random_transforms (bool, optional): Whether to not use random resized crop and
+            random horizontal flip. Default: ``False``.
     """
     download: bool = hp.optional('whether to download the dataset, if needed', default=True)
     use_ffcv: bool = hp.optional('whether to use ffcv for faster dataloading', default=False)
@@ -55,9 +57,11 @@ class CIFAR10DatasetHparams(DatasetHparams, SyntheticHparamsMixin):
     ffcv_dest: str = hp.optional('<file>.ffcv file that has dataset samples', default='cifar_train.ffcv')
     ffcv_write_dataset: bool = hp.optional("Whether to create dataset in FFCV format (<file>.ffcv) if it doesn't exist",
                                            default=False)
+    no_random_transforms: bool = hp.optional("Don't use RRC and random LR flip.", default=False)
 
     is_train: bool = hp.optional('Whether to load the training data (the default) or validation data.', default=True)
     datadir: Optional[str] = hp.optional('The path to the data directory', default=None)
+    no_random_transforms: bool = hp.optional("Don't use RRC and random LR flip.", default=False)
 
     def initialize_object(self, batch_size: int, dataloader_hparams: DataLoaderHparams):
 
@@ -150,12 +154,19 @@ class CIFAR10DatasetHparams(DatasetHparams, SyntheticHparamsMixin):
             cifar10_std = 0.247, 0.243, 0.261
 
             if self.is_train:
-                transformation = transforms.Compose([
-                    transforms.RandomCrop(32, padding=4),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(cifar10_mean, cifar10_std),
-                ])
+                if self.no_random_transforms:
+                    transformation = transforms.Compose([
+                        transforms.CenterCrop(32),
+                        transforms.ToTensor(),
+                        transforms.Normalize(cifar10_mean, cifar10_std),
+                    ])
+                else:
+                    transformation = transforms.Compose([
+                        transforms.RandomCrop(32, padding=4),
+                        transforms.RandomHorizontalFlip(),
+                        transforms.ToTensor(),
+                        transforms.Normalize(cifar10_mean, cifar10_std),
+                    ])
             else:
                 transformation = transforms.Compose([
                     transforms.ToTensor(),
@@ -187,7 +198,10 @@ class StreamingCIFAR10Hparams(DatasetHparams):
             Default: ``'s3://mosaicml-internal-dataset-cifar10/mds/1/'``
         local (str): Local filesystem directory where dataset is cached during operation.
             Default: ``'/tmp/mds-cache/mds-cifar10/'``
-        split (str): The dataset split to use, either 'train' or 'val'. Default: ``'train'``.
+        split (str): The dataset split to use, either 'train' or 'val'. Default:
+            ``'train'``.
+        no_random_transforms (bool, optional): Whether to not use random resized crop and
+            random horizontal flip. Default: ``False``.
     """
 
     remote: str = hp.optional('Remote directory (S3 or local filesystem) where dataset is stored',
@@ -195,13 +209,15 @@ class StreamingCIFAR10Hparams(DatasetHparams):
     local: str = hp.optional('Local filesystem directory where dataset is cached during operation',
                              default='/tmp/mds-cache/mds-cifar10/')
     split: str = hp.optional("Which split of the dataset to use. Either ['train', 'val']", default='train')
+    no_random_transforms: bool = hp.optional("Don't use RRC and random LR flip.", default=False)
 
     def initialize_object(self, batch_size: int, dataloader_hparams: DataLoaderHparams) -> DataLoader:
         dataset = StreamingCIFAR10(remote=self.remote,
                                    local=self.local,
                                    split=self.split,
                                    shuffle=self.shuffle,
-                                   batch_size=batch_size)
+                                   batch_size=batch_size,
+                                   no_random_transforms=self.no_random_transforms)
         return dataloader_hparams.initialize_object(dataset,
                                                     batch_size=batch_size,
                                                     sampler=None,

@@ -30,6 +30,7 @@ class StreamingCIFAR10(StreamingDataset, VisionDataset):
         split (str): The dataset split to use, either 'train' or 'val'.
         shuffle (bool): Whether to shuffle the samples in this dataset.
         batch_size (Optional[int]): Hint batch_size that will be used on each device's DataLoader. Default: ``None``.
+        no_random_transforms: bool = hp.optional("Don't use RRC and random LR flip.", default=False)
     """
 
     def decode_image(self, data: bytes) -> Image.Image:
@@ -56,7 +57,13 @@ class StreamingCIFAR10(StreamingDataset, VisionDataset):
         """
         return np.frombuffer(data, np.int64)[0]
 
-    def __init__(self, remote: str, local: str, split: str, shuffle: bool, batch_size: Optional[int] = None):
+    def __init__(self,
+                 remote: str,
+                 local: str,
+                 split: str,
+                 shuffle: bool,
+                 batch_size: Optional[int] = None,
+                 no_random_transforms: Optional[bool] = False):
         # Build StreamingDataset
         decoders = {
             'x': self.decode_image,
@@ -76,12 +83,19 @@ class StreamingCIFAR10(StreamingDataset, VisionDataset):
         channel_means = 0.4914, 0.4822, 0.4465
         channel_stds = 0.247, 0.243, 0.261
         if split == 'train':
-            transform = transforms.Compose([
-                transforms.RandomCrop(32, 4),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(channel_means, channel_stds),
-            ])
+            if no_random_transforms:
+                transform = transforms.Compose([
+                    transforms.CenterCrop(32),
+                    transforms.ToTensor(),
+                    transforms.Normalize(channel_means, channel_stds),
+                ])
+            else:
+                transform = transforms.Compose([
+                    transforms.RandomCrop(32, 4),
+                    transforms.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(channel_means, channel_stds),
+                ])
         else:
             transform = transforms.Compose([
                 transforms.ToTensor(),
